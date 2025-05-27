@@ -230,3 +230,78 @@
 (define-read-only (get-market (market-id uint))
   (map-get? markets market-id)
 )
+
+;; Get User Prediction Details
+(define-read-only (get-user-prediction
+    (market-id uint)
+    (user principal)
+  )
+  (map-get? user-predictions {
+    market-id: market-id,
+    user: user,
+  })
+)
+
+;; Get Contract STX Balance
+(define-read-only (get-contract-balance)
+  (stx-get-balance (as-contract tx-sender))
+)
+
+;; Get Current Market Counter
+(define-read-only (get-market-counter)
+  (var-get market-counter)
+)
+
+;; Get Platform Configuration
+(define-read-only (get-platform-config)
+  {
+    oracle-address: (var-get oracle-address),
+    minimum-stake: (var-get minimum-stake),
+    fee-percentage: (var-get fee-percentage),
+  }
+)
+
+;; ADMINISTRATIVE FUNCTIONS
+
+;; Update Oracle Address
+;; Contract owner can change the authorized oracle for market resolution
+(define-public (set-oracle-address (new-address principal))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-OWNER-ONLY)
+    (asserts! (is-eq new-address new-address) ERR-INVALID-PARAMETER)
+    (ok (var-set oracle-address new-address))
+  )
+)
+
+;; Update Minimum Stake Requirement
+;; Adjust minimum STX amount required for predictions
+(define-public (set-minimum-stake (new-minimum uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-OWNER-ONLY)
+    (asserts! (> new-minimum u0) ERR-INVALID-PARAMETER)
+    (ok (var-set minimum-stake new-minimum))
+  )
+)
+
+;; Update Platform Fee Percentage
+;; Modify fee percentage taken from winnings (max 100%)
+(define-public (set-fee-percentage (new-fee uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-OWNER-ONLY)
+    (asserts! (<= new-fee u100) ERR-INVALID-PARAMETER)
+    (ok (var-set fee-percentage new-fee))
+  )
+)
+
+;; Withdraw Accumulated Platform Fees
+;; Contract owner can withdraw collected fees from contract
+(define-public (withdraw-fees (amount uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-OWNER-ONLY)
+    (asserts! (<= amount (stx-get-balance (as-contract tx-sender)))
+      ERR-INSUFFICIENT-BALANCE
+    )
+    (try! (as-contract (stx-transfer? amount (as-contract tx-sender) CONTRACT-OWNER)))
+    (ok amount)
+  )
+)
